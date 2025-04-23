@@ -1,16 +1,19 @@
+use std::io::Cursor;
+
 use rusqlite::{params, Connection, Result};
 use serde::{Deserialize, Serialize};
+use zstd::{decode_all, encode_all};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StorableNoodle {
     pub id: usize,
-    pub img: String,
+    pub img: Vec<u8>,                  // Changed from String to Vec<u8>
     pub current_rating: Option<usize>, // Changed from single rating to Option
     pub ratings: Vec<usize>,           // Changed from single rating to Vec of ratings
 }
 
 impl StorableNoodle {
-    pub fn new(img: String, rating: usize) -> Self {
+    pub fn new(img: Vec<u8>, rating: usize) -> Self {
         StorableNoodle {
             id: 0,
             img,
@@ -54,9 +57,10 @@ impl Db {
     }
 
     pub fn store_noodle(&self, noodle: &StorableNoodle) -> Result<()> {
+        let compressed_img = encode_all(Cursor::new(&noodle.img), 13).unwrap_or_default();
         self.connection.execute(
             "INSERT INTO noodle_images (img) VALUES (?1)",
-            params![noodle.img],
+            params![compressed_img],
         )?;
 
         // Get the last inserted noodle_id
@@ -93,7 +97,8 @@ impl Db {
 
         let rows = stmt.query_map([], |row| {
             let id: usize = row.get(0)?;
-            let img: String = row.get(1)?;
+            let compressed_img: Vec<u8> = row.get(1)?;
+            let img = decode_all(Cursor::new(compressed_img)).unwrap_or_default();
             let rating: Option<usize> = row.get(2).ok();
 
             Ok((id, img, rating))

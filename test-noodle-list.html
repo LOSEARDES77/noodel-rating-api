@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Noodle Gallery</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+
+<body class="min-h-screen bg-gray-100 flex flex-col items-center p-6">
+    <h1 class="text-3xl font-bold mb-6 text-gray-800">Noodle Gallery</h1>
+    <div id="noodleGrid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6 w-full max-w-6xl">
+    </div>
+    <script>
+        async function loadNoodles() {
+            const grid = document.getElementById('noodleGrid');
+            grid.innerHTML = '<div class="col-span-full text-center">Loading...</div>';
+            try {
+                const res = await fetch('http://127.0.0.1:8000/api/noodles');
+                const noodles = await res.json();
+                if (!Array.isArray(noodles) || noodles.length === 0) {
+                    grid.innerHTML = '<div class="col-span-full text-center">No noodles found.</div>';
+                    return;
+                }
+                grid.innerHTML = '';
+                noodles.forEach(noodle => {
+                    const card = document.createElement('div');
+                    card.className = 'bg-white rounded-xl shadow-md p-4 flex flex-col items-center';
+                    card.innerHTML = `
+                        <img src="${noodle.img}" alt="Noodle" class="w-40 h-40 object-cover rounded mb-2 border" />
+                        <div class="text-gray-700 font-semibold">ID: ${noodle.id}</div>
+                        <div class="text-gray-500 text-sm">Ratings: ${noodle.ratings.length}</div>
+                    `;
+                    grid.appendChild(card);
+                });
+            } catch (err) {
+                grid.innerHTML = `<div class="col-span-full text-center text-red-500">Failed to load noodles: ${err.message}</div>`;
+            }
+        }
+        loadNoodles();
+    </script>
+</body>
+
+</html>

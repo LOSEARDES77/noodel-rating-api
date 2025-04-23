@@ -27,10 +27,17 @@ pub struct RateNoodle {
     pub rating: usize,
 }
 
+#[derive(serde::Serialize)]
+pub struct ApiNoodle {
+    pub id: usize,
+    pub img: String,
+    pub ratings: Vec<usize>,
+}
+
 #[post("/api/noodle", data = "<noodle>")]
 fn create_noodle(noodle: Form<Noodle<'_>>, db: &rocket::State<Mutex<Db>>) -> String {
     let noodle = noodle.into_inner();
-    let storable = StorableNoodle::new(noodle.img.to_string(), noodle.rating);
+    let storable = StorableNoodle::new(noodle.img.as_bytes().to_vec(), noodle.rating); // Convert to Vec<u8>
 
     let result = db.lock().unwrap().store_noodle(&storable);
 
@@ -68,8 +75,16 @@ fn get_noodles(db: &rocket::State<Mutex<Db>>) -> RawJson<String> {
         }
     };
 
-    // Convert noodles to JSON string
-    match serde_json::to_string(&noodles) {
+    let api_noodles: Vec<ApiNoodle> = noodles
+        .into_iter()
+        .map(|n| ApiNoodle {
+            id: n.id,
+            img: String::from_utf8_lossy(&n.img).to_string(),
+            ratings: n.ratings,
+        })
+        .collect();
+
+    match serde_json::to_string(&api_noodles) {
         Ok(json) => RawJson(json),
         Err(e) => RawJson(format!(
             "{{\"error\": \"Failed to serialize noodles: {}\"}}",
