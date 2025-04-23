@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Noodle Submission</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+
+<body class="min-h-screen bg-gray-100 flex items-center justify-center px-4">
+    <form id="noodleForm" class="w-full max-w-md bg-white rounded-2xl shadow-xl p-6 space-y-4">
+        <h1 class="text-2xl font-bold text-center text-gray-800">Submit a Noodle</h1>
+
+        <!-- Noodle selection dropdown -->
+        <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1" for="noodleSelect">
+                Select Noodle:
+            </label>
+            <select name="noodle" id="noodleSelect"
+                class="w-full rounded border-gray-300 focus:ring-green-400 focus:border-green-400" required>
+                <option value="" disabled selected>Loading...</option>
+            </select>
+        </div>
+
+        <!-- Rating input with live display -->
+        <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">
+                Rating: <span id="ratingDisplay" class="font-bold text-green-600">5</span>
+            </label>
+            <input type="range" name="rating" min="1" max="10" step="1" value="5" id="ratingInput"
+                class="w-full accent-green-500 focus:outline-none focus:ring-2 focus:ring-green-400 rounded" required />
+        </div>
+
+        <button type="submit"
+            class="w-full bg-green-500 text-white py-2 px-4 rounded-lg font-semibold hover:bg-green-600 transition duration-200">
+            Submit
+        </button>
+
+        <div id="response" class="text-sm text-center text-gray-600"></div>
+    </form>
+
+    <script>
+        const form = document.getElementById('noodleForm');
+        const responseBox = document.getElementById('response');
+        const ratingInput = document.getElementById('ratingInput');
+        const ratingDisplay = document.getElementById('ratingDisplay');
+        const noodleSelect = document.getElementById('noodleSelect');
+
+        // Fetch noodles from API and populate dropdown
+        async function loadNoodles() {
+            try {
+                const res = await fetch('http://127.0.0.1:8000/api/noodles');
+                const noodles = await res.json();
+                noodleSelect.innerHTML = '';
+                if (Array.isArray(noodles) && noodles.length > 0) {
+                    noodles.forEach(noodle => {
+                        // Use noodle.id as value, noodle.img as display
+                        const option = document.createElement('option');
+                        option.value = noodle.id;
+                        option.textContent = noodle.img;
+                        noodleSelect.appendChild(option);
+                    });
+                } else {
+                    const option = document.createElement('option');
+                    option.value = '';
+                    option.textContent = 'No noodles found';
+                    noodleSelect.appendChild(option);
+                }
+            } catch (err) {
+                noodleSelect.innerHTML = '';
+                const option = document.createElement('option');
+                option.value = '';
+                option.textContent = 'Failed to load noodles';
+                noodleSelect.appendChild(option);
+            }
+        }
+        loadNoodles();
+
+        ratingInput.addEventListener('input', () => {
+            ratingDisplay.textContent = ratingInput.value;
+        });
+
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const noodleId = noodleSelect.value;
+            const ratingValue = ratingInput.value;
+
+            const formData = new URLSearchParams();
+            formData.append('noodle_id', noodleId);
+            formData.append('rating', ratingValue);
+            if (!noodleId) {
+                responseBox.textContent = 'Please select a noodle.';
+                return;
+            }
+
+            try {
+                const res = await fetch(`http://127.0.0.1:8000/api/rate`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded'
+                    },
+                    body: formData
+                });
+
+                const text = await res.text();
+                responseBox.textContent = `✅ ${text}`;
+            } catch (err) {
+                responseBox.textContent = `❌ Error: ${err.message}`;
+            }
+        });
+    </script>
+</body>
+
+</html>
