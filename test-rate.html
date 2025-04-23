@@ -10,7 +10,7 @@
 
 <body class="min-h-screen bg-gray-100 flex items-center justify-center px-4">
     <form id="noodleForm" class="w-full max-w-md bg-white rounded-2xl shadow-xl p-6 space-y-4">
-        <h1 class="text-2xl font-bold text-center text-gray-800">Submit a Noodle</h1>
+        <h1 class="text-2xl font-bold text-center text-gray-800">Rate a Noodle</h1>
 
         <!-- Noodle selection dropdown -->
         <div>
@@ -21,6 +21,12 @@
                 class="w-full rounded border-gray-300 focus:ring-green-400 focus:border-green-400" required>
                 <option value="" disabled selected>Loading...</option>
             </select>
+        </div>
+
+        <!-- Selected noodle info -->
+        <div id="noodleInfo" class="hidden border rounded-md p-3 bg-gray-50">
+            <h3 class="font-medium text-gray-800" id="selectedNoodleName"></h3>
+            <p class="text-sm text-gray-600 mt-1" id="selectedNoodleDescription"></p>
         </div>
 
         <!-- Rating input with live display -->
@@ -52,13 +58,28 @@
             try {
                 const res = await fetch('http://127.0.0.1:8000/api/noodles');
                 const noodles = await res.json();
+                // Store noodles data for later use
+                window.noodlesData = noodles;
+
                 noodleSelect.innerHTML = '';
                 if (Array.isArray(noodles) && noodles.length > 0) {
+                    const defaultOption = document.createElement('option');
+                    defaultOption.value = '';
+                    defaultOption.textContent = '-- Select a noodle --';
+                    defaultOption.disabled = true;
+                    defaultOption.selected = true;
+                    noodleSelect.appendChild(defaultOption);
+
                     noodles.forEach(noodle => {
-                        // Use noodle.id as value, noodle.img as display
+                        // Use noodle.id as value, noodle.name as display
                         const option = document.createElement('option');
                         option.value = noodle.id;
-                        option.textContent = noodle.img;
+                        option.textContent = noodle.name;
+                        // Store the full noodle data as a data attribute
+                        option.dataset.noodleData = JSON.stringify({
+                            name: noodle.name,
+                            description: noodle.description
+                        });
                         noodleSelect.appendChild(option);
                     });
                 } else {
@@ -76,6 +97,30 @@
             }
         }
         loadNoodles();
+
+        // Show noodle details when selected
+        noodleSelect.addEventListener('change', () => {
+            const selectedOption = noodleSelect.options[noodleSelect.selectedIndex];
+            const noodleInfo = document.getElementById('noodleInfo');
+            const nameElement = document.getElementById('selectedNoodleName');
+            const descElement = document.getElementById('selectedNoodleDescription');
+
+            if (selectedOption.value && selectedOption.dataset.noodleData) {
+                const noodleData = JSON.parse(selectedOption.dataset.noodleData);
+                nameElement.textContent = noodleData.name;
+
+                if (noodleData.description) {
+                    descElement.textContent = noodleData.description;
+                    descElement.classList.remove('hidden');
+                } else {
+                    descElement.classList.add('hidden');
+                }
+
+                noodleInfo.classList.remove('hidden');
+            } else {
+                noodleInfo.classList.add('hidden');
+            }
+        });
 
         ratingInput.addEventListener('input', () => {
             ratingDisplay.textContent = ratingInput.value;

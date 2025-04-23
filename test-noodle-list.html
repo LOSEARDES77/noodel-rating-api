@@ -28,9 +28,10 @@
                     const card = document.createElement('div');
                     card.className = 'bg-white rounded-xl shadow-md p-4 flex flex-col items-center';
                     card.innerHTML = `
-                        <img src="${noodle.img}" alt="Noodle" class="w-40 h-40 object-cover rounded mb-2 border" />
-                        <div class="text-gray-700 font-semibold">ID: ${noodle.id}</div>
-                        <div class="text-gray-500 text-sm">Ratings: ${noodle.ratings.length}</div>
+                        <img src="${noodle.img}" alt="${noodle.name}" class="w-40 h-40 object-cover rounded mb-2 border" />
+                        <div class="text-gray-700 font-semibold">${noodle.name}</div>
+                        ${noodle.description ? `<p class="text-gray-600 text-sm mt-1">${noodle.description}</p>` : ''}
+                        <div class="text-gray-500 text-sm mt-2">ID: ${noodle.id} | Ratings: ${noodle.ratings.length}</div>
                     `;
                     grid.appendChild(card);
                 });

@@ -12,6 +12,20 @@
     <form id="noodleForm" class="w-full max-w-md bg-white rounded-2xl shadow-xl p-6 space-y-4">
         <h1 class="text-2xl font-bold text-center text-gray-800">Submit a Noodle</h1>
 
+        <!-- Name field -->
+        <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Name</label>
+            <input type="text" name="name"
+                class="w-full rounded border-gray-300 focus:ring-green-400 focus:border-green-400" required />
+        </div>
+
+        <!-- Description field -->
+        <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Description (Optional)</label>
+            <textarea name="description" rows="2"
+                class="w-full rounded border-gray-300 focus:ring-green-400 focus:border-green-400"></textarea>
+        </div>
+
         <!-- Rating input with live display -->
         <div>
             <label class="block text-sm font-medium text-gray-700 mb-1">
@@ -20,8 +34,6 @@
             <input type="range" name="rating" min="1" max="10" step="1" value="5" id="ratingInput"
                 class="w-full accent-green-500 focus:outline-none focus:ring-2 focus:ring-green-400 rounded" required />
         </div>
-
-
 
         <label class="block text-sm font-medium text-gray-700">Image</label>
         <input type="file" name="img" accept="image/*"
@@ -47,10 +59,11 @@
             ratingDisplay.textContent = ratingInput.value;
         });
 
-
         form.addEventListener('submit', async (e) => {
             e.preventDefault();
 
+            const nameInput = form.querySelector('input[name="name"]');
+            const descInput = form.querySelector('textarea[name="description"]');
             const fileInput = form.querySelector('input[name="img"]');
             const ratingInput = form.querySelector('input[name="rating"]');
             const file = fileInput.files[0];
@@ -60,11 +73,20 @@
                 return;
             }
 
+            if (!nameInput.value.trim()) {
+                responseBox.textContent = "Please enter a name for the noodle.";
+                return;
+            }
+
             const reader = new FileReader();
             reader.onload = async () => {
                 const dataUrl = reader.result;
 
                 const formData = new URLSearchParams();
+                formData.append('name', nameInput.value);
+                if (descInput.value.trim()) {
+                    formData.append('description', descInput.value);
+                }
                 formData.append('img', dataUrl);
                 formData.append('rating', ratingInput.value);
 
@@ -79,6 +101,10 @@
 
                     const text = await res.text();
                     responseBox.textContent = `✅ ${text}`;
+                    // Clear the form
+                    nameInput.value = '';
+                    descInput.value = '';
+                    fileInput.value = '';
                 } catch (err) {
                     responseBox.textContent = `❌ Error: ${err.message}`;
                 }

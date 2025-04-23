@@ -17,6 +17,8 @@ mod db;
 
 #[derive(FromForm, Clone)]
 pub struct Noodle<'r> {
+    pub name: &'r str,
+    pub description: Option<&'r str>,
     pub img: &'r str,
     pub rating: usize,
 }
@@ -30,14 +32,22 @@ pub struct RateNoodle {
 #[derive(serde::Serialize)]
 pub struct ApiNoodle {
     pub id: usize,
-    pub img: String,
+    pub name: String,
+    pub description: Option<String>,
+    pub img: String, // base64
+    pub current_rating: Option<usize>,
     pub ratings: Vec<usize>,
 }
 
 #[post("/api/noodle", data = "<noodle>")]
 fn create_noodle(noodle: Form<Noodle<'_>>, db: &rocket::State<Mutex<Db>>) -> String {
     let noodle = noodle.into_inner();
-    let storable = StorableNoodle::new(noodle.img.as_bytes().to_vec(), noodle.rating); // Convert to Vec<u8>
+    let storable = StorableNoodle::new(
+        noodle.name.to_string(),
+        noodle.description.map(|desc| desc.to_string()),
+        noodle.img.as_bytes().to_vec(),
+        noodle.rating,
+    ); // Convert to Vec<u8>
 
     let result = db.lock().unwrap().store_noodle(&storable);
 
@@ -79,7 +89,10 @@ fn get_noodles(db: &rocket::State<Mutex<Db>>) -> RawJson<String> {
         .into_iter()
         .map(|n| ApiNoodle {
             id: n.id,
+            name: n.name,
+            description: n.description,
             img: String::from_utf8_lossy(&n.img).to_string(),
+            current_rating: n.current_rating,
             ratings: n.ratings,
         })
         .collect();
