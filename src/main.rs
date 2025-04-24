@@ -3,9 +3,6 @@ extern crate rocket;
 use base64::{engine::general_purpose, Engine as _};
 use cors::CORS;
 use db::{Db, StorableNoodle};
-// use openai_api_rust::chat::*;
-// use openai_api_rust::completions::*;
-// use openai_api_rust::*;
 use rocket::{
     data::{Limits, ToByteUnit},
     form::Form,
