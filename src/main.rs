@@ -1,6 +1,6 @@
 #[macro_use]
 extern crate rocket;
-use cors::CORS;
+use crate::cors::CORS;
 use db::{Db, StorableNoodle};
 // use openai_api_rust::chat::*;
 // use openai_api_rust::completions::*;

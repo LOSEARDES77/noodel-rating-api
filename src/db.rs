@@ -62,7 +62,51 @@ impl Db {
     }
 
     pub fn store_noodle(&self, noodle: &StorableNoodle) -> Result<()> {
-        let compressed_img = encode_all(Cursor::new(&noodle.img), 0).unwrap_or_default();
+        // Create a temporary file for the input image
+        let input_file = tempfile::Builder::new().tempfile().map_err(|e| {
+            rusqlite::Error::InvalidParameterName(format!("Failed to create temp file: {}", e))
+        })?;
+        std::fs::write(input_file.path(), &noodle.img).map_err(|e| {
+            rusqlite::Error::InvalidParameterName(format!("Failed to write temp file: {}", e))
+        })?;
+
+        // Create a temporary file for the output WebP image
+        let output_file = tempfile::Builder::new()
+            .suffix(".webp")
+            .tempfile()
+            .map_err(|e| {
+                rusqlite::Error::InvalidParameterName(format!("Failed to create temp file: {}", e))
+            })?;
+
+        // Use ffmpeg to convert the image to WebP
+        let status = std::process::Command::new("ffmpeg")
+            .args([
+                "-i",
+                input_file.path().to_str().unwrap(),
+                "-vf",
+                "scale=800:-1",
+                "-y", // Overwrite output files without asking
+                output_file.path().to_str().unwrap(),
+            ])
+            .status()
+            .map_err(|e| {
+                rusqlite::Error::InvalidParameterName(format!("Failed to run ffmpeg: {}", e))
+            })?;
+
+        if !status.success() {
+            return Err(rusqlite::Error::InvalidParameterName(
+                "ffmpeg conversion failed".to_string(),
+            ));
+        }
+
+        // Read the WebP image
+        let webp_img = std::fs::read(output_file.path()).map_err(|e| {
+            rusqlite::Error::InvalidParameterName(format!("Failed to read WebP image: {}", e))
+        })?;
+
+        // Compress the WebP image with zstd
+        let compressed_img = encode_all(Cursor::new(&webp_img), 0).unwrap_or_default();
+
         self.connection.execute(
             "INSERT INTO noodle_images (name, description, img) VALUES (?1, ?2, ?3)",
             params![noodle.name, noodle.description, compressed_img],
