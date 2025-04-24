@@ -28,7 +28,7 @@
                     const card = document.createElement('div');
                     card.className = 'bg-white rounded-xl shadow-md p-4 flex flex-col items-center';
                     card.innerHTML = `
-                        <img src="${noodle.img}" alt="${noodle.name}" class="w-40 h-40 object-cover rounded mb-2 border" />
+                        <img src="data:image/webp;base64,${noodle.img}" alt="${noodle.name}" class="w-40 h-40 object-cover rounded mb-2 border" />
                         <div class="text-gray-700 font-semibold">${noodle.name}</div>
                         ${noodle.description ? `<p class="text-gray-600 text-sm mt-1">${noodle.description}</p>` : ''}
                         <div class="text-gray-500 text-sm mt-2">ID: ${noodle.id} | Ratings: ${noodle.ratings.length}</div>

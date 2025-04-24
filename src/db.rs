@@ -1,7 +1,11 @@
+use std::fs::File;
 use std::io::Cursor;
+use std::io::Write;
+use std::process::Command;
 
 use rusqlite::{params, Connection, Result};
 use serde::{Deserialize, Serialize};
+use uuid::Uuid;
 use zstd::{decode_all, encode_all};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -62,50 +66,20 @@ impl Db {
     }
 
     pub fn store_noodle(&self, noodle: &StorableNoodle) -> Result<()> {
-        // Create a temporary file for the input image
-        let input_file = tempfile::Builder::new().tempfile().map_err(|e| {
-            rusqlite::Error::InvalidParameterName(format!("Failed to create temp file: {}", e))
-        })?;
-        std::fs::write(input_file.path(), &noodle.img).map_err(|e| {
-            rusqlite::Error::InvalidParameterName(format!("Failed to write temp file: {}", e))
-        })?;
-
-        // Create a temporary file for the output WebP image
-        let output_file = tempfile::Builder::new()
-            .suffix(".webp")
-            .tempfile()
-            .map_err(|e| {
-                rusqlite::Error::InvalidParameterName(format!("Failed to create temp file: {}", e))
-            })?;
-
-        // Use ffmpeg to convert the image to WebP
-        let status = std::process::Command::new("ffmpeg")
-            .args([
-                "-i",
-                input_file.path().to_str().unwrap(),
-                "-vf",
-                "scale=800:-1",
-                "-y", // Overwrite output files without asking
-                output_file.path().to_str().unwrap(),
-            ])
-            .status()
-            .map_err(|e| {
-                rusqlite::Error::InvalidParameterName(format!("Failed to run ffmpeg: {}", e))
-            })?;
-
-        if !status.success() {
-            return Err(rusqlite::Error::InvalidParameterName(
-                "ffmpeg conversion failed".to_string(),
-            ));
-        }
-
-        // Read the WebP image
-        let webp_img = std::fs::read(output_file.path()).map_err(|e| {
-            rusqlite::Error::InvalidParameterName(format!("Failed to read WebP image: {}", e))
-        })?;
+        // Convert image to WebP
+        let webp_data = match convert_to_webp(&noodle.img) {
+            Ok(data) => data,
+            Err(e) => {
+                eprintln!(
+                    "Warning: Failed to convert image to WebP: {}. Using original image.",
+                    e
+                );
+                noodle.img.clone()
+            }
+        };
 
         // Compress the WebP image with zstd
-        let compressed_img = encode_all(Cursor::new(&webp_img), 0).unwrap_or_default();
+        let compressed_img = encode_all(Cursor::new(&webp_data), 0).unwrap_or_default();
 
         self.connection.execute(
             "INSERT INTO noodle_images (name, description, img) VALUES (?1, ?2, ?3)",
@@ -174,4 +148,63 @@ impl Db {
 
         Ok(noodles_map.into_values().collect())
     }
+}
+
+// Convert image to WebP using ffmpeg
+fn convert_to_webp(img_data: &[u8]) -> Result<Vec<u8>, String> {
+    // Create temporary directories
+    let temp_dir = std::env::temp_dir().join("noodle_images");
+    std::fs::create_dir_all(&temp_dir)
+        .map_err(|e| format!("Failed to create temp directory: {}", e))?;
+
+    // Generate unique filenames for input and output
+    let uuid = Uuid::new_v4();
+    let input_path = temp_dir.join(format!("{}_input", uuid));
+    let output_path = temp_dir.join(format!("{}_output.webp", uuid));
+
+    // Write input image to temporary file
+    let mut file =
+        File::create(&input_path).map_err(|e| format!("Failed to create input file: {}", e))?;
+    file.write_all(img_data)
+        .map_err(|e| format!("Failed to write image data: {}", e))?;
+
+    // Run ffmpeg to convert to WebP
+    let output = Command::new("ffmpeg")
+        .arg("-i")
+        .arg(&input_path)
+        .arg("-vf")
+        .arg("scale=800:-1")
+        .arg("-preset")
+        .arg("photo") // Use photo preset for better color preservation
+        .arg("-pix_fmt")
+        .arg("yuva420p") // Ensure proper color format
+        .arg("-vcodec")
+        .arg("libwebp") // Explicitly use libwebp codec
+        .arg("-lossless") // If this makes the files too large, you can remove this line
+        .arg("0") // or set it to 0 for lossy compression
+        .arg("-compression_level")
+        .arg("6")
+        .arg("-q:v")
+        .arg("90")
+        .arg(&output_path)
+        .output()
+        .map_err(|e| format!("Failed to execute ffmpeg: {}", e))?;
+
+    // Check if ffmpeg was successful
+    if !output.status.success() {
+        return Err(format!(
+            "ffmpeg failed: {}",
+            String::from_utf8_lossy(&output.stderr)
+        ));
+    }
+
+    // Read the output WebP file
+    let webp_data =
+        std::fs::read(&output_path).map_err(|e| format!("Failed to read WebP file: {}", e))?;
+
+    // Clean up temporary files
+    std::fs::remove_file(&input_path).ok();
+    std::fs::remove_file(&output_path).ok();
+
+    Ok(webp_data)
 }
