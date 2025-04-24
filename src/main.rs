@@ -145,7 +145,7 @@ fn rocket() -> _ {
 
     let db = Db::new("noodles.db").expect("Failed to connect to database");
 
-    let config = Config::figment().merge(("limits", Limits::new().limit("form", 10.mebibytes())));
+    let config = Config::figment().merge(("limits", Limits::new().limit("form", 64.mebibytes())));
 
     rocket::custom(config)
         .manage(Mutex::new(db))
