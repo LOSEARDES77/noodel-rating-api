@@ -38,6 +38,16 @@
                 class="w-full accent-green-500 focus:outline-none focus:ring-2 focus:ring-green-400 rounded" required />
         </div>
 
+        <!-- Review input -->
+        <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1" for="reviewInput">
+                Review (optional):
+            </label>
+            <textarea id="reviewInput" name="review" rows="3"
+                class="w-full rounded border-gray-300 focus:ring-green-400 focus:border-green-400"
+                placeholder="What did you think about this noodle?"></textarea>
+        </div>
+
         <button type="submit"
             class="w-full bg-green-500 text-white py-2 px-4 rounded-lg font-semibold hover:bg-green-600 transition duration-200">
             Submit
@@ -131,13 +141,20 @@
 
             const noodleId = noodleSelect.value;
             const ratingValue = ratingInput.value;
+            const reviewText = document.getElementById('reviewInput').value.trim();
+
+            if (!noodleId) {
+                responseBox.textContent = 'Please select a noodle.';
+                return;
+            }
 
             const formData = new URLSearchParams();
             formData.append('noodle_id', noodleId);
             formData.append('rating', ratingValue);
-            if (!noodleId) {
-                responseBox.textContent = 'Please select a noodle.';
-                return;
+
+            // Only add review if it's not empty
+            if (reviewText) {
+                formData.append('review', reviewText);
             }
 
             try {
@@ -151,6 +168,11 @@
 
                 const text = await res.text();
                 responseBox.textContent = `✅ ${text}`;
+
+                // Clear the form
+                document.getElementById('reviewInput').value = '';
+                ratingInput.value = '5';
+                ratingDisplay.textContent = '5';
             } catch (err) {
                 responseBox.textContent = `❌ Error: ${err.message}`;
             }

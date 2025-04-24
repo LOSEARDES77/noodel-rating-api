@@ -25,6 +25,7 @@ pub struct Noodle<'r> {
 pub struct RateNoodle {
     pub noodle_id: usize,
     pub rating: usize,
+    pub review: Option<String>,
 }
 
 #[derive(serde::Serialize)]
@@ -34,7 +35,7 @@ pub struct ApiNoodle {
     pub description: Option<String>,
     pub img: String, // base64
     pub current_rating: Option<usize>,
-    pub ratings: Vec<usize>,
+    pub ratings: Vec<db::StorableRating>,
 }
 
 /// Decode an image from a base64 string or data URL
@@ -90,7 +91,7 @@ fn rate_noodle(rating: Form<RateNoodle>, db: &rocket::State<Mutex<Db>>) -> Strin
     let result = db
         .lock()
         .unwrap()
-        .rate_noodle(rating.noodle_id, rating.rating);
+        .rate_noodle(rating.noodle_id, rating.rating, rating.review);
 
     match result {
         Ok(_) => "Ok".to_string(),

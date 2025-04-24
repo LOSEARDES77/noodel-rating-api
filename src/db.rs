@@ -7,13 +7,20 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct StorableRating {
+    pub noodle_id: usize,
+    pub rating: usize,
+    pub review: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StorableNoodle {
     pub id: usize,
     pub name: String,
     pub description: Option<String>,
     pub img: Vec<u8>,
     pub current_rating: Option<usize>,
-    pub ratings: Vec<usize>,
+    pub ratings: Vec<StorableRating>,
 }
 
 impl StorableNoodle {
@@ -38,6 +45,7 @@ impl Db {
         let connection = Connection::open(path)?;
         let db = Db { connection };
         db.init()?;
+        db.migrate()?; // Add migration call after initialization
         Ok(db)
     }
 
@@ -56,10 +64,30 @@ impl Db {
                 rating_id INTEGER PRIMARY KEY AUTOINCREMENT,
                 noodle_id INTEGER NOT NULL,
                 rating INTEGER NOT NULL,
+                review TEXT,
                 FOREIGN KEY (noodle_id) REFERENCES noodle_images (noodle_id)
             )",
             [],
         )?;
+        Ok(())
+    }
+
+    // Add migration function to add missing columns
+    fn migrate(&self) -> Result<()> {
+        // Check if review column exists in noodle_ratings table
+        let mut stmt = self.connection.prepare(
+            "SELECT COUNT(*) FROM pragma_table_info('noodle_ratings') WHERE name = 'review'",
+        )?;
+        let has_review_column: i64 = stmt.query_row([], |row| row.get(0))?;
+
+        // Add the column if it doesn't exist
+        if has_review_column == 0 {
+            println!("Adding 'review' column to noodle_ratings table...");
+            self.connection
+                .execute("ALTER TABLE noodle_ratings ADD COLUMN review TEXT", [])?;
+            println!("Migration complete!");
+        }
+
         Ok(())
     }
 
@@ -103,10 +131,15 @@ impl Db {
         Ok(())
     }
 
-    pub fn rate_noodle(&self, noodle_id: usize, rating: usize) -> Result<()> {
+    pub fn rate_noodle(
+        &self,
+        noodle_id: usize,
+        rating: usize,
+        review: Option<String>,
+    ) -> Result<()> {
         self.connection.execute(
-            "INSERT INTO noodle_ratings (noodle_id, rating) VALUES (?1, ?2)",
-            params![noodle_id, rating],
+            "INSERT INTO noodle_ratings (noodle_id, rating, review) VALUES (?1, ?2, ?3)",
+            params![noodle_id, rating, review],
         )?;
         Ok(())
     }
@@ -115,7 +148,7 @@ impl Db {
         let mut noodles_map = std::collections::HashMap::new();
 
         let mut stmt = self.connection.prepare(
-            "SELECT n.noodle_id, n.name, n.description, n.img, r.rating 
+            "SELECT n.noodle_id, n.name, n.description, n.img, r.rating, r.review
              FROM noodle_images n 
              LEFT JOIN noodle_ratings r ON n.noodle_id = r.noodle_id 
              ORDER BY n.noodle_id",
@@ -127,17 +160,18 @@ impl Db {
             let description: Option<String> = row.get(2)?;
             let img: Vec<u8> = row.get(3)?;
             let rating: Option<usize> = row.get(4).ok();
+            let review: Option<String> = row.get(5).ok();
 
             println!(
                 "Retrieved image for noodle {}, size: {} bytes",
                 id,
                 img.len()
             );
-            Ok((id, name, description, img, rating))
+            Ok((id, name, description, img, rating, review))
         })?;
 
         for row_result in rows {
-            let (id, name, description, img, rating) = row_result?;
+            let (id, name, description, img, rating, review) = row_result?;
 
             noodles_map.entry(id).or_insert_with(|| StorableNoodle {
                 id,
@@ -149,7 +183,12 @@ impl Db {
             });
 
             if let Some(r) = rating {
-                noodles_map.get_mut(&id).unwrap().ratings.push(r);
+                let ratings = &mut noodles_map.get_mut(&id).unwrap().ratings;
+                ratings.push(StorableRating {
+                    noodle_id: id,
+                    rating: r,
+                    review,
+                });
             }
         }
 
