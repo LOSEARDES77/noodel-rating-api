@@ -228,8 +228,8 @@ fn convert_to_webp(img_data: &[u8]) -> Result<Vec<u8>, String> {
     );
 
     // Clean up temporary files
-    // std::fs::remove_file(&input_path).ok();
-    // std::fs::remove_file(&output_path).ok();
+    std::fs::remove_file(&input_path).ok();
+    std::fs::remove_file(&output_path).ok();
 
     Ok(webp_data)
 }
